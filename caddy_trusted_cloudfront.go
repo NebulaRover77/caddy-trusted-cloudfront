@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"sync"
 	"time"
 
@@ -35,6 +36,8 @@ func init() {
 type CaddyTrustedCloudFront struct {
 	// Interval to update the trusted proxies list. default: 1d
 	Interval caddy.Duration `json:"interval,omitempty"`
+	// URL to fetch CloudFront EDGE IP ranges from.
+	URL string `json:"url,omitempty"`
 	ranges   []netip.Prefix
 	ctx      caddy.Context
 	lock     *sync.RWMutex
@@ -55,6 +58,12 @@ func (s *CaddyTrustedCloudFront) Provision(ctx caddy.Context) error {
 	}
 	if time.Duration(s.Interval) <= 0 {
 		return fmt.Errorf("interval must be greater than 0")
+	}
+	if s.URL == "" {
+		s.URL = cloudFrontEdgeFetchURL
+	}
+	if err := validateURL(s.URL); err != nil {
+		return fmt.Errorf("invalid url: %w", err)
 	}
 
 	// update cron
@@ -89,7 +98,7 @@ type CloudFrontIPSource struct {
 }
 
 func (s *CaddyTrustedCloudFront) fetchPrefixes() ([]netip.Prefix, error) {
-	data, err := fetchJSON[CloudFrontIPSource](s.ctx, cloudFrontEdgeFetchURL)
+	data, err := fetchJSON[CloudFrontIPSource](s.ctx, s.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -125,6 +134,7 @@ func (s *CaddyTrustedCloudFront) GetIPRanges(_ *http.Request) []netip.Prefix {
 //
 //	cloudfront {
 //	   interval <duration>
+//	   url <http(s)-url>
 //	}
 func (m *CaddyTrustedCloudFront) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	d.Next() // consume directive name
@@ -147,6 +157,14 @@ func (m *CaddyTrustedCloudFront) UnmarshalCaddyfile(d *caddyfile.Dispenser) erro
 				return fmt.Errorf("interval must be greater than 0")
 			}
 			m.Interval = caddy.Duration(val)
+		case "url":
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			m.URL = d.Val()
+			if err := validateURL(m.URL); err != nil {
+				return fmt.Errorf("invalid url: %w", err)
+			}
 		default:
 			return d.ArgErr()
 		}
@@ -160,6 +178,8 @@ func (m *CaddyTrustedCloudFront) UnmarshalCaddyfile(d *caddyfile.Dispenser) erro
 type CaddyTrustedCloudFrontOriginFacing struct {
 	// Interval to update the trusted proxies list. default: 1d
 	Interval caddy.Duration `json:"interval,omitempty"`
+	// URL to fetch AWS IP ranges from.
+	URL string `json:"url,omitempty"`
 	// IPFamily controls which address family is loaded: dual_stack (default), ipv4, ipv6.
 	IPFamily IPFamily `json:"ip_family,omitempty"`
 	ranges   []netip.Prefix
@@ -182,6 +202,12 @@ func (s *CaddyTrustedCloudFrontOriginFacing) Provision(ctx caddy.Context) error 
 	}
 	if time.Duration(s.Interval) <= 0 {
 		return fmt.Errorf("interval must be greater than 0")
+	}
+	if s.URL == "" {
+		s.URL = awsIPRangesFetchURL
+	}
+	if err := validateURL(s.URL); err != nil {
+		return fmt.Errorf("invalid url: %w", err)
 	}
 	if s.IPFamily == "" {
 		s.IPFamily = ipFamilyDualStack
@@ -217,7 +243,7 @@ func (s *CaddyTrustedCloudFrontOriginFacing) Provision(ctx caddy.Context) error 
 }
 
 func (s *CaddyTrustedCloudFrontOriginFacing) fetchPrefixes() ([]netip.Prefix, error) {
-	data, err := fetchJSON[AWSIPRanges](s.ctx, awsIPRangesFetchURL)
+	data, err := fetchJSON[AWSIPRanges](s.ctx, s.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -235,6 +261,7 @@ func (s *CaddyTrustedCloudFrontOriginFacing) GetIPRanges(_ *http.Request) []neti
 //	cloudfront_origin_facing {
 //	   interval <duration>
 //	   ip_family dual_stack|ipv4|ipv6
+//	   url <http(s)-url>
 //	}
 func (m *CaddyTrustedCloudFrontOriginFacing) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	d.Next()
@@ -264,6 +291,14 @@ func (m *CaddyTrustedCloudFrontOriginFacing) UnmarshalCaddyfile(d *caddyfile.Dis
 			m.IPFamily = IPFamily(d.Val())
 			if !m.IPFamily.Valid() {
 				return fmt.Errorf("unsupported ip_family %q", m.IPFamily)
+			}
+		case "url":
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			m.URL = d.Val()
+			if err := validateURL(m.URL); err != nil {
+				return fmt.Errorf("invalid url: %w", err)
 			}
 		default:
 			return d.ArgErr()
@@ -363,6 +398,20 @@ func fetchJSON[T any](ctx context.Context, url string) (T, error) {
 		return data, err
 	}
 	return data, nil
+}
+
+func validateURL(rawURL string) error {
+	parsedURL, err := url.ParseRequestURI(rawURL)
+	if err != nil {
+		return err
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("unsupported scheme %q", parsedURL.Scheme)
+	}
+	if parsedURL.Host == "" {
+		return fmt.Errorf("url host is required")
+	}
+	return nil
 }
 
 // Interface guards
