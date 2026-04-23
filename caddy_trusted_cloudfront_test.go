@@ -35,8 +35,13 @@ func TestSyntax(t *testing.T) {
 	assert.Nil(t, err, err)
 	err = testSyntax(`cloudfront {
 		interval 12h
+		url https://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips
 	}`)
 	assert.Nil(t, err, err)
+	err = testSyntax(`cloudfront {
+		url not-a-url
+	}`)
+	assert.NotNil(t, err, "invalid url should be invalid")
 	err = testSyntax(`cloudfront {
 		interval 0.8h
 		invalid_name 100
@@ -58,6 +63,7 @@ func TestOriginFacingSyntax(t *testing.T) {
 	err = testOriginFacingSyntax(`cloudfront_origin_facing {
 		interval 12h
 		ip_family dual_stack
+		url https://ip-ranges.amazonaws.com/ip-ranges.json
 	}`)
 	assert.Nil(t, err, err)
 	err = testOriginFacingSyntax(`cloudfront_origin_facing {
@@ -72,6 +78,10 @@ func TestOriginFacingSyntax(t *testing.T) {
 		ip_family invalid
 	}`)
 	assert.NotNil(t, err, "invalid ip_family should be invalid")
+	err = testOriginFacingSyntax(`cloudfront_origin_facing {
+		url not-a-url
+	}`)
+	assert.NotNil(t, err, "invalid url should be invalid")
 	err = testOriginFacingSyntax(`cloudfront_origin_facing {
 		interval 0s
 	}`)

@@ -71,10 +71,12 @@ $ xcaddy build --with github.com/<your-github-user>/caddy-trusted-cloudfront
 ```caddyfile
 trusted_proxies cloudfront {
 	interval <duration>
+	url <http(s)-url>
 }
 ```
 
 - `interval` How often to fetch the latest IP list. format is [caddy.Duration](https://caddyserver.com/docs/conventions#durations). For example `12h` represents **12 hours**, and `1d` represents **one day**. default value `1d`.
+- `url` Optional override for the CloudFront EDGE IP list endpoint. Default: `https://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips`.
 
 ### New module: `cloudfront_origin_facing`
 
@@ -82,6 +84,7 @@ trusted_proxies cloudfront {
 trusted_proxies cloudfront_origin_facing {
 	interval <duration>
 	ip_family dual_stack|ipv4|ipv6
+	url <http(s)-url>
 }
 ```
 
@@ -90,6 +93,7 @@ trusted_proxies cloudfront_origin_facing {
   - `dual_stack` (default): include both `ip_prefix` and `ipv6_prefix`
   - `ipv4`: include only `ip_prefix`
   - `ipv6`: include only `ipv6_prefix`
+- `url` Optional override for the AWS ranges JSON endpoint. Default: `https://ip-ranges.amazonaws.com/ip-ranges.json`.
 
 ## `Caddyfile` examples
 
