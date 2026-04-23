@@ -50,12 +50,15 @@ func (CaddyTrustedCloudFront) CaddyModule() caddy.ModuleInfo {
 func (s *CaddyTrustedCloudFront) Provision(ctx caddy.Context) error {
 	s.ctx = ctx
 	s.lock = new(sync.RWMutex)
+	if s.Interval == 0 {
+		s.Interval = caddy.Duration(24 * time.Hour) // default to 24 hours
+	}
+	if time.Duration(s.Interval) <= 0 {
+		return fmt.Errorf("interval must be greater than 0")
+	}
 
 	// update cron
 	go func() {
-		if s.Interval == 0 {
-			s.Interval = caddy.Duration(24 * time.Hour) // default to 24 hours
-		}
 		ticker := time.NewTicker(time.Duration(s.Interval))
 		s.lock.Lock()
 		s.ranges, _ = s.fetchPrefixes()
@@ -139,6 +142,9 @@ func (m *CaddyTrustedCloudFront) UnmarshalCaddyfile(d *caddyfile.Dispenser) erro
 			if err != nil {
 				return err
 			}
+			if val <= 0 {
+				return fmt.Errorf("interval must be greater than 0")
+			}
 			m.Interval = caddy.Duration(val)
 		default:
 			return d.ArgErr()
@@ -170,6 +176,12 @@ func (CaddyTrustedCloudFrontOriginFacing) CaddyModule() caddy.ModuleInfo {
 func (s *CaddyTrustedCloudFrontOriginFacing) Provision(ctx caddy.Context) error {
 	s.ctx = ctx
 	s.lock = new(sync.RWMutex)
+	if s.Interval == 0 {
+		s.Interval = caddy.Duration(24 * time.Hour)
+	}
+	if time.Duration(s.Interval) <= 0 {
+		return fmt.Errorf("interval must be greater than 0")
+	}
 	if s.IPFamily == "" {
 		s.IPFamily = ipFamilyDualStack
 	}
@@ -178,9 +190,6 @@ func (s *CaddyTrustedCloudFrontOriginFacing) Provision(ctx caddy.Context) error 
 	}
 
 	go func() {
-		if s.Interval == 0 {
-			s.Interval = caddy.Duration(24 * time.Hour)
-		}
 		ticker := time.NewTicker(time.Duration(s.Interval))
 		s.lock.Lock()
 		s.ranges, _ = s.fetchPrefixes()
@@ -241,6 +250,9 @@ func (m *CaddyTrustedCloudFrontOriginFacing) UnmarshalCaddyfile(d *caddyfile.Dis
 			val, err := caddy.ParseDuration(d.Val())
 			if err != nil {
 				return err
+			}
+			if val <= 0 {
+				return fmt.Errorf("interval must be greater than 0")
 			}
 			m.Interval = caddy.Duration(val)
 		case "ip_family":

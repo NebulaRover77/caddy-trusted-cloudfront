@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -41,6 +42,14 @@ func TestSyntax(t *testing.T) {
 		invalid_name 100
 	}`)
 	assert.NotNil(t, err, "invalid_name should be invalid")
+	err = testSyntax(`cloudfront {
+		interval 0s
+	}`)
+	assert.NotNil(t, err, "interval 0s should be invalid")
+	err = testSyntax(`cloudfront {
+		interval -1h
+	}`)
+	assert.NotNil(t, err, "negative interval should be invalid")
 }
 
 func TestOriginFacingSyntax(t *testing.T) {
@@ -63,6 +72,29 @@ func TestOriginFacingSyntax(t *testing.T) {
 		ip_family invalid
 	}`)
 	assert.NotNil(t, err, "invalid ip_family should be invalid")
+	err = testOriginFacingSyntax(`cloudfront_origin_facing {
+		interval 0s
+	}`)
+	assert.NotNil(t, err, "interval 0s should be invalid")
+	err = testOriginFacingSyntax(`cloudfront_origin_facing {
+		interval -1h
+	}`)
+	assert.NotNil(t, err, "negative interval should be invalid")
+}
+
+func TestProvisionRejectsNonPositiveIntervalProgrammaticConfig(t *testing.T) {
+	ctx, cancel := caddy.NewContext(caddy.Context{Context: context.TODO()})
+	defer cancel()
+
+	cf := &CaddyTrustedCloudFront{Interval: caddy.Duration(-1 * time.Hour)}
+	err := cf.Provision(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "interval must be greater than 0")
+
+	originFacing := &CaddyTrustedCloudFrontOriginFacing{Interval: caddy.Duration(-1 * time.Hour)}
+	err = originFacing.Provision(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "interval must be greater than 0")
 }
 
 func TestParseAWSIPRangesJSON(t *testing.T) {
