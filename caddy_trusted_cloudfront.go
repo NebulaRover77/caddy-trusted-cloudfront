@@ -60,8 +60,9 @@ func (s *CaddyTrustedCloudFront) Provision(ctx caddy.Context) error {
 	// update cron
 	go func() {
 		ticker := time.NewTicker(time.Duration(s.Interval))
+		prefixes, _ := s.fetchPrefixes()
 		s.lock.Lock()
-		s.ranges, _ = s.fetchPrefixes()
+		s.ranges = prefixes
 		s.lock.Unlock()
 		for {
 			select {
@@ -191,8 +192,9 @@ func (s *CaddyTrustedCloudFrontOriginFacing) Provision(ctx caddy.Context) error 
 
 	go func() {
 		ticker := time.NewTicker(time.Duration(s.Interval))
+		prefixes, _ := s.fetchPrefixes()
 		s.lock.Lock()
-		s.ranges, _ = s.fetchPrefixes()
+		s.ranges = prefixes
 		s.lock.Unlock()
 		for {
 			select {
