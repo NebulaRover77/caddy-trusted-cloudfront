@@ -30,7 +30,11 @@ and supports both:
 
 ## Install
 
-The simplest, cross-platform way to get started is to download Caddy from [GitHub Releases](https://github.com/xcaddyplugins/caddy-trusted-cloudfront/releases) and place the executable file in your PATH.
+> [!IMPORTANT]
+> `cloudfront_origin_facing` is currently a fork-only feature until this work is merged upstream.
+> Upstream releases at <https://github.com/xcaddyplugins/caddy-trusted-cloudfront/releases> may not include this module yet.
+
+To test or use `cloudfront_origin_facing` right now, build Caddy with your fork module path using `xcaddy`.
 
 ## Build from source
 
@@ -45,7 +49,7 @@ Build from upstream module path:
 $ xcaddy build --with github.com/xcaddyplugins/caddy-trusted-cloudfront
 ```
 
-Build from your fork while testing unmerged changes:
+Build from your fork (required while this feature is unmerged upstream):
 
 ```bash
 $ xcaddy build --with github.com/<your-github-user>/caddy-trusted-cloudfront
