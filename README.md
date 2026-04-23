@@ -2,9 +2,35 @@
 [![Licenses](https://img.shields.io/github/license/xcaddyplugins/caddy-trusted-cloudfront)](LICENSE)
 [![donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.buymeacoffee.com/illi)
 
-# trusted_proxies cloudfront module for `Caddy`
+# trusted_proxies modules for `Caddy`
 
-The module auto trusted_proxies `AWS CloudFront EDGE servers` from https://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips
+This project now provides two trusted proxies modules:
+
+- `cloudfront` (existing behavior): trusts `AWS CloudFront EDGE servers` from <https://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips>
+- `cloudfront_origin_facing` (new behavior): trusts CloudFront **origin-facing** addresses from AWS <https://ip-ranges.amazonaws.com/ip-ranges.json>
+
+## Why `cloudfront_origin_facing` exists
+
+The legacy CloudFront list endpoint (`https://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips`) is edge-focused and does not represent the CloudFront origin-facing ranges you typically need when trusting requests at origin.
+
+For origin trust specifically, this legacy approach is a major issue because it does **not support IPv6 origin-facing ranges**.
+
+In practice, this can lead to:
+
+- CloudFront reaching your origin over IPv6
+- the old `cloudfront` trusted proxy source not including the matching origin-facing IPv6 ranges
+- Caddy not trusting the incoming CloudFront proxy IP
+- viewer IP handling breaking, even though CloudFront is forwarding viewer IP headers
+
+The `cloudfront_origin_facing` module solves this by filtering AWS `ip-ranges.json` entries to only:
+
+- `service == "CLOUDFRONT_ORIGIN_FACING"`
+- `region == "GLOBAL"`
+
+and supports both:
+
+- `ip_prefix` (IPv4)
+- `ipv6_prefix` (IPv6)
 
 ## Requirements
 
@@ -13,7 +39,11 @@ The module auto trusted_proxies `AWS CloudFront EDGE servers` from https://d7uri
 
 ## Install
 
-The simplest, cross-platform way to get started is to download Caddy from [GitHub Releases](https://github.com/xcaddyplugins/caddy-trusted-cloudfront/releases) and place the executable file in your PATH.
+> [!IMPORTANT]
+> `cloudfront_origin_facing` is currently a fork-only feature until this work is merged upstream.
+> Upstream releases at <https://github.com/xcaddyplugins/caddy-trusted-cloudfront/releases> may not include this module yet.
+
+To test or use `cloudfront_origin_facing` right now, build Caddy with your fork module path using `xcaddy`.
 
 ## Build from source
 
@@ -22,13 +52,21 @@ Requirements:
 - [Go installed](https://golang.org/doc/install)
 - [xcaddy](https://github.com/caddyserver/xcaddy)
 
-Build:
+Build from upstream module path:
 
 ```bash
 $ xcaddy build --with github.com/xcaddyplugins/caddy-trusted-cloudfront
 ```
 
-## `Caddyfile` Syntax
+Build from your fork (required while this feature is unmerged upstream):
+
+```bash
+$ xcaddy build --with github.com/<your-github-user>/caddy-trusted-cloudfront
+```
+
+## `Caddyfile` syntax
+
+### Existing module: `cloudfront`
 
 ```caddyfile
 trusted_proxies cloudfront {
@@ -36,30 +74,67 @@ trusted_proxies cloudfront {
 }
 ```
 
-- `interval` How often to fetch the latest IP list. format is [caddy.Duration](https://caddyserver.com/docs/conventions#durations). For example `12h` represents **12 hours**, and "1d" represents **one day**. default value `1d`.
+- `interval` How often to fetch the latest IP list. format is [caddy.Duration](https://caddyserver.com/docs/conventions#durations). For example `12h` represents **12 hours**, and `1d` represents **one day**. default value `1d`.
 
-## `Caddyfile` Example
+### New module: `cloudfront_origin_facing`
 
 ```caddyfile
-trusted_proxies cloudfront {
-	interval 1d
+trusted_proxies cloudfront_origin_facing {
+	interval <duration>
+	ip_family dual_stack|ipv4|ipv6
 }
 ```
 
-### `Caddyfile` Use Default Settings Example
+- `interval` Same refresh interval behavior as `cloudfront` (default `1d`).
+- `ip_family` Controls which AWS ranges are trusted:
+  - `dual_stack` (default): include both `ip_prefix` and `ipv6_prefix`
+  - `ipv4`: include only `ip_prefix`
+  - `ipv6`: include only `ipv6_prefix`
 
-```Caddyfile
-trusted_proxies cloudfront
+## `Caddyfile` examples
+
+### Use new module with defaults (`dual_stack`)
+
+```caddyfile
+trusted_proxies cloudfront_origin_facing
 ```
 
-## `Caddyfile` Global Trusted Example
+### New module with explicit `dual_stack`
 
-Insert the following configuration of `Caddyfile` to apply it globally.
+```caddyfile
+trusted_proxies cloudfront_origin_facing {
+	interval 12h
+	ip_family dual_stack
+}
+```
 
-```Caddyfile
+### New module IPv4 only
+
+```caddyfile
+trusted_proxies cloudfront_origin_facing {
+	interval 12h
+	ip_family ipv4
+}
+```
+
+### New module IPv6 only
+
+```caddyfile
+trusted_proxies cloudfront_origin_facing {
+	interval 12h
+	ip_family ipv6
+}
+```
+
+### Global trusted proxies example
+
+```caddyfile
 {
 	servers {
-		trusted_proxies cloudfront
+		trusted_proxies cloudfront_origin_facing {
+			interval 12h
+			ip_family dual_stack
+		}
 	}
 }
 ```
