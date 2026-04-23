@@ -11,7 +11,16 @@ This project now provides two trusted proxies modules:
 
 ## Why `cloudfront_origin_facing` exists
 
-The legacy CloudFront list endpoint is edge-focused and does not represent the CloudFront origin-facing ranges you typically need when trusting requests at origin.
+The legacy CloudFront list endpoint (`https://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips`) is edge-focused and does not represent the CloudFront origin-facing ranges you typically need when trusting requests at origin.
+
+For origin trust specifically, this legacy approach is a major issue because it does **not support IPv6 origin-facing ranges**.
+
+In practice, this can lead to:
+
+- CloudFront reaching your origin over IPv6
+- the old `cloudfront` trusted proxy source not including the matching origin-facing IPv6 ranges
+- Caddy not trusting the incoming CloudFront proxy IP
+- viewer IP handling breaking, even though CloudFront is forwarding viewer IP headers
 
 The `cloudfront_origin_facing` module solves this by filtering AWS `ip-ranges.json` entries to only:
 
